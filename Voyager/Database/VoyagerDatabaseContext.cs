@@ -7,11 +7,11 @@ public class VoyagerDatabaseContext : RealmDatabaseContext
 {
     public Index AddIndex(List<GopherLine> lines, Uri uri, string? displayName)
     {
-        Index index = new ()
+        Index index = new()
         {
             Uri = uri.ToString(),
             Time = DateTimeOffset.UtcNow,
-            DisplayName = displayName,
+            DisplayName = displayName
         };
         lines.ForEach(l =>
         {

@@ -8,17 +8,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Bunkum" Version="4.3.1" />
-      <PackageReference Include="Bunkum.Protocols.Gemini" Version="4.3.1" />
-      <PackageReference Include="Bunkum.Protocols.Gopher" Version="4.3.1" />
-      <PackageReference Include="Bunkum.RealmDatabase" Version="4.3.1" />
-      <PackageReference Include="Bunkum.Serialization.GopherToGemini" Version="4.3.1" />
-      <PackageReference Include="OneOf" Version="3.0.263" />
-      <PackageReference Include="Realm" Version="11.5.0" />
+        <PackageReference Include="Bunkum" Version="4.3.1"/>
+        <PackageReference Include="Bunkum.Protocols.Gemini" Version="4.3.1"/>
+        <PackageReference Include="Bunkum.Protocols.Gopher" Version="4.3.1"/>
+        <PackageReference Include="Bunkum.RealmDatabase" Version="4.3.1"/>
+        <PackageReference Include="Bunkum.Serialization.GopherToGemini" Version="4.3.1"/>
+        <PackageReference Include="OneOf" Version="3.0.263"/>
+        <PackageReference Include="Realm" Version="11.5.0"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Endpoints\" />
+        <Folder Include="Endpoints\"/>
     </ItemGroup>
 
 </Project>

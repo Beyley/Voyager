@@ -7,7 +7,7 @@ namespace Voyager.Extensions;
 public static class GohpermapListExtensions
 {
     /// <summary>
-    /// Helper function to add a heading, differing between the protocol
+    ///     Helper function to add a heading, differing between the protocol
     /// </summary>
     public static void AddHeading(this IList<GophermapItem> list, RequestContext context, string text, int level)
     {

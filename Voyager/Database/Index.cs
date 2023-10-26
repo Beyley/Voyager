@@ -1,4 +1,3 @@
-using Bunkum.Protocols.Gopher.Responses;
 using Realms;
 using Voyager.Spider;
 

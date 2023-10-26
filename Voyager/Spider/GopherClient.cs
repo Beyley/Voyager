@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using OneOf;
@@ -14,9 +15,9 @@ public class GopherClient
         IAsyncResult result = client.BeginConnect(hostname, port, null, null);
         bool success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2));
         if (!success)
-            throw new Exception("Failed to connect.");
+            throw new TimeoutException($"Failed to connect to {hostname}.");
         client.EndConnect(result);
-        
+
         client.ReceiveTimeout = 1000;
         client.SendTimeout = 1000;
 
@@ -33,7 +34,7 @@ public class GopherClient
         stream.WriteByte((byte)'\n');
         stream.Flush();
 
-        MemoryStream memoryStream = new();
+        MemoryStream memoryStream = new(4096);
         Span<byte> buf = stackalloc byte[4096];
         while (true)
         {
@@ -61,26 +62,29 @@ public class GopherClient
                     string[] splitLine = rawLine.Split("\t");
                     if (splitLine.Length == 0) throw new Exception("Unable to parse gopher submenu!");
 
+                    //NON COMPLIANT SERVERS WHYYYYY
+                    if (string.IsNullOrWhiteSpace(splitLine[0])) continue;
+                    
                     GopherLine line = new()
                     {
                         Type = (GopherType)(byte)splitLine[0][0],
-                        DisplayString = splitLine[0][1..],
-                        Hostname = hostname,
+                        DisplayString = splitLine[0][1..].Trim(),
+                        Hostname = hostname.Trim(),
                         Port = port,
                         Selector = ""
                     };
 
                     if (splitLine.Length > 1)
                     {
-                        line.Selector = splitLine[1];
+                        line.Selector = splitLine[1].Trim();
                         if (line.Selector.Length > 0 && line.Selector[0] != '/')
                         {
                             line.Selector = "/" + line.Selector;
                         }
                     }
-                    if (splitLine.Length > 2) line.Hostname = splitLine[2];
+                    if (splitLine.Length > 2) line.Hostname = splitLine[2].Trim();
                     if (splitLine.Length > 3)
-                        if (ushort.TryParse(splitLine[3], out ushort parsedPort))
+                        if (ushort.TryParse(splitLine[3].Trim(), out ushort parsedPort))
                             line.Port = parsedPort;
 
                     lines.Add(line);
