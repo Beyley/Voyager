@@ -16,7 +16,8 @@ public class VoyagerDatabaseProvider : RealmDatabaseProvider<VoyagerDatabaseCont
         {
             typeof(Index),
             typeof(GopherLine),
-            typeof(QueuedSelector)
+            typeof(QueuedSelector),
+            typeof(CrawledHost)
         };
     }
     protected override string Filename

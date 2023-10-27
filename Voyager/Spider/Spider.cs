@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using OneOf;
+using Realms;
 using Voyager.Database;
 using Index = Voyager.Database.Index;
 
@@ -14,22 +15,64 @@ public class Spider
     private readonly List<string> _hosts = new();
     private readonly ConcurrentDictionary<string, ConcurrentQueue<QueuedSelector>> _queues = new();
     private readonly List<Uri> _uris;
+    private readonly List<string> _blacklistedHosts;
 
-    public Spider(List<Uri> uris, VoyagerDatabaseProvider databaseProvider)
+    public Spider(List<Uri> uris, List<string> blacklistedHosts, VoyagerDatabaseProvider databaseProvider)
     {
         this._uris = uris;
         this._databaseProvider = databaseProvider;
+        this._blacklistedHosts = blacklistedHosts;
 
+        VoyagerDatabaseContext database = databaseProvider.GetContext();
+        using Transaction transaction = database.Realm.BeginWrite();
+        List<QueuedSelector> selectors = database.GetQueuedSelectors().AsEnumerable().Select(s => s.DeepCopy()).ToList();
+        database.ClearQueuedSelectors();
+        foreach (QueuedSelector selector in selectors)
+        {
+            this.AddToQueue(selector.DeepCopy(), database);
+        }
+        
         //Enqueue all URLs to crawl
         foreach (Uri uri in this._uris)
             this.AddToQueue(new QueuedSelector
             {
                 Uri = uri
             }, databaseProvider.GetContext());
+        transaction.Commit();
     }
 
     private void AddToQueue(QueuedSelector selector, VoyagerDatabaseContext database)
     {
+        if (this._blacklistedHosts.Contains(selector.Uri.Host))
+        {
+            Console.WriteLine($"Refusing to add blacklisted host {selector.Uri.Host}");
+            return;
+        }
+        
+        if(selector.Uri.Host.Contains("git", StringComparison.InvariantCultureIgnoreCase))
+        {
+            Console.WriteLine($"Refusing to add git host");
+            return;
+        }
+        
+        if(selector.Uri.Host.Contains("scm", StringComparison.InvariantCultureIgnoreCase))
+        {
+            Console.WriteLine($"Refusing to add scm host");
+            return;
+        }
+        
+        if(selector.Uri.AbsolutePath.Contains("/git", StringComparison.InvariantCultureIgnoreCase))
+        {
+            Console.WriteLine($"Refusing to add git selector");
+            return;
+        }
+        
+        if(selector.Uri.AbsolutePath.Contains("/scm", StringComparison.InvariantCultureIgnoreCase))
+        {
+            Console.WriteLine($"Refusing to add scm selector");
+            return;
+        }
+        
         if (!this._queues.TryGetValue(selector.Uri.Host, out ConcurrentQueue<QueuedSelector>? queue))
         {
             this._queues[selector.Uri.Host] = new ConcurrentQueue<QueuedSelector>();
@@ -40,10 +83,11 @@ public class Spider
             }
         }
 
-        if (!database.Crawled(selector.Uri) && queue.All(q => q.Uri != selector.Uri))
+        if (!database.Crawled(selector.Uri) && queue.All(q => q._Uri != selector._Uri))
         {
             Console.WriteLine($"Adding {selector.Uri} to queue");
             queue.Enqueue(selector);
+            database.AddQueuedSelector(selector);
         }
         else
         {
@@ -53,7 +97,7 @@ public class Spider
 
     public void Start()
     {
-        const int threadCount = 2;
+        const int threadCount = 48;
 
         ThreadData[] threads = new ThreadData[threadCount];
         for (int i = 0; i < threads.Length; i++)
@@ -63,6 +107,7 @@ public class Spider
                 Thread = new Thread(this.ThreadRun),
                 Run = true,
                 Busy = false,
+                Id = i,
             };
             threads[i].Thread.Start(threads[i]);
         }
@@ -109,7 +154,7 @@ public class Spider
             Thread.Sleep(10);
 
             i++;
-            i %= this._queues.Count;
+            i = (i + data.Id) % this._queues.Count;
 
             string host;
             //Get a random host
@@ -124,11 +169,14 @@ public class Spider
                 data.Busy = false;
                 continue;
             }
+            
+            VoyagerDatabaseContext database = this._databaseProvider.GetContext();
+            using Transaction transaction = database.Realm.BeginWrite();
+            database.RemoveQueuedSelector(selector);
+            transaction.Commit();
 
             Uri uri = selector.Uri;
-
-            VoyagerDatabaseContext database = this._databaseProvider.GetContext();
-
+            
             if (database.Crawled(uri))
             {
                 Console.WriteLine($"Already crawled {uri}, skipping");
@@ -146,19 +194,20 @@ public class Spider
                     bytes => {},
                     gophermap =>
                     {
+                        using Transaction transaction = database.Realm.BeginWrite();
                         Index index = database.AddIndex(gophermap, uri, selector.DisplayName);
 
-                        foreach (GopherLine line in gophermap)
+                        foreach (GopherLine submenuLine in index.Items)
                         {
-                            if (line.Type == GopherType.Submenu)
+                            if (submenuLine.Type == GopherType.Submenu)
                             {
                                 try
                                 {
-                                    Uri uri1 = new Uri($"gopher://{line.Hostname}:{line.Port}{line.Selector}");
+                                    Uri uri1 = new Uri($"gopher://{submenuLine.Hostname}:{submenuLine.Port}{submenuLine.Selector}");
                                     this.AddToQueue(new QueuedSelector
                                     {
                                         Uri = uri1,
-                                        DisplayName = line.DisplayString
+                                        DisplayName = submenuLine.DisplayString
                                     }, database);
                                 }
                                 catch
@@ -167,34 +216,35 @@ public class Spider
                                 }
                             }
                         }
+                        transaction.Commit();
                     },
                     text => {}
                 );
 
                 //Increment the amount of things we have crawled
                 Interlocked.Increment(ref data.Crawled);
+                using Transaction transaction2 = database.Realm.BeginWrite();
+                database.SetHostCrawlStatus(uri.Host, false);
+                transaction2.Commit();
             }
             catch(TimeoutException ex)
             {
                 Console.WriteLine($"Timeout! {ex}");
+                database.Realm.Write(() => database.SetHostCrawlStatus(uri.Host, true));
             }
             catch(SocketException ex)
             {
                 Console.WriteLine($"Socket exception! {ex}");
+                database.Realm.Write(() => database.SetHostCrawlStatus(uri.Host, true));
             }
             catch(IOException ex)
             {
                 Console.WriteLine(ex);
+                database.Realm.Write(() => database.SetHostCrawlStatus(uri.Host, true));
             }
 
             data.Busy = false;
         }
-    }
-
-    private class QueuedSelector
-    {
-        public string? DisplayName;
-        public Uri Uri;
     }
 
     private class ThreadData
@@ -203,5 +253,6 @@ public class Spider
         public required bool Run;
         public required bool Busy;
         public required Thread Thread;
+        public required int Id;
     }
 }

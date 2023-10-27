@@ -6,8 +6,16 @@ provider.Initialize();
 
 Spider spider = new(new List<Uri>
 {
-    new("gopher://littlebigrefresh.com")
-    // new("gopher://gopher.floodgap.com")
+    // new("gopher://littlebigrefresh.com")
+    new("gopher://gopher.floodgap.com")
+}, new List<string>
+{
+    //host git stuff that we need to just blanket block for now
+    "parazyd.org",
+    "suckless.org",
+    "gopher.r-36.net",
+    "adamsgaard.dk",
+    "bitreich.org",
 }, provider);
 spider.Start();
 
