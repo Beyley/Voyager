@@ -24,6 +24,6 @@ public class VoyagerDatabaseContext : RealmDatabaseContext
 
     public bool Crawled(Uri uri)
     {
-        return this._realm.All<Index>().Any(i => i.Uri == uri.ToString());
+        return this._realm.Find<Index>(uri.ToString()) != null;
     }
 }

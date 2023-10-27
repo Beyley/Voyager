@@ -10,6 +10,8 @@ public class Spider
 {
     private readonly VoyagerDatabaseProvider _databaseProvider;
 
+    //List of hosts, used so we dont have to do .Keys.ToArray()[i]
+    private readonly List<string> _hosts = new();
     private readonly ConcurrentDictionary<string, ConcurrentQueue<QueuedSelector>> _queues = new();
     private readonly List<Uri> _uris;
 
@@ -23,19 +25,30 @@ public class Spider
             this.AddToQueue(new QueuedSelector
             {
                 Uri = uri
-            });
+            }, databaseProvider.GetContext());
     }
 
-    private void AddToQueue(QueuedSelector selector)
+    private void AddToQueue(QueuedSelector selector, VoyagerDatabaseContext database)
     {
-        Console.WriteLine($"Adding {selector.Uri} to selector");
         if (!this._queues.TryGetValue(selector.Uri.Host, out ConcurrentQueue<QueuedSelector>? queue))
         {
             this._queues[selector.Uri.Host] = new ConcurrentQueue<QueuedSelector>();
             queue = this._queues[selector.Uri.Host];
+            lock (this._hosts)
+            {
+                this._hosts.Add(selector.Uri.Host);
+            }
         }
 
-        queue.Enqueue(selector);
+        if (!database.Crawled(selector.Uri) && queue.All(q => q.Uri != selector.Uri))
+        {
+            Console.WriteLine($"Adding {selector.Uri} to queue");
+            queue.Enqueue(selector);
+        }
+        else
+        {
+            Console.WriteLine($"Selector {selector.Uri} has already been crawled, not adding!");
+        }
     }
 
     public void Start()
@@ -98,7 +111,10 @@ public class Spider
             i++;
             i %= this._queues.Count;
 
-            string host = this._queues.Keys.ToArray()[i];
+            string host;
+            //Get a random host
+            lock (this._hosts)
+                host = this._hosts[i];
             ConcurrentQueue<QueuedSelector> queue = this._queues[host];
 
             data.Busy = true;
@@ -143,7 +159,7 @@ public class Spider
                                     {
                                         Uri = uri1,
                                         DisplayName = line.DisplayString
-                                    });
+                                    }, database);
                                 }
                                 catch
                                 {
