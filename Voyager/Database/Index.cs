@@ -9,5 +9,6 @@ public partial class Index : IRealmObject
     public string Uri { get; set; }
     public IList<GopherLine> Items { get; }
     public DateTimeOffset Time { get; set; }
+    [Indexed(IndexType.FullText)]
     public string? DisplayName { get; set; }
 }

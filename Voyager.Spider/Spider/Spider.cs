@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
+using NotEnoughLogs;
 using OneOf;
 using Realms;
 using Voyager.Database;
@@ -10,6 +11,7 @@ namespace Voyager.Spider;
 public class Spider
 {
     private readonly VoyagerDatabaseProvider _databaseProvider;
+    private readonly Logger _logger;
 
     //List of hosts, used so we dont have to do .Keys.ToArray()[i]
     private readonly List<string> _hosts = new();
@@ -17,59 +19,71 @@ public class Spider
     private readonly List<Uri> _uris;
     private readonly List<string> _blacklistedHosts;
 
-    public Spider(List<Uri> uris, List<string> blacklistedHosts, VoyagerDatabaseProvider databaseProvider)
+    public Spider(List<Uri> uris, List<string> blacklistedHosts, VoyagerDatabaseProvider databaseProvider, Logger logger)
     {
         this._uris = uris;
         this._databaseProvider = databaseProvider;
+        this._logger = logger;
         this._blacklistedHosts = blacklistedHosts;
 
         VoyagerDatabaseContext database = databaseProvider.GetContext();
-        using Transaction transaction = database.Realm.BeginWrite();
-        List<QueuedSelector> selectors = database.GetQueuedSelectors().AsEnumerable().Select(s => s.DeepCopy()).ToList();
-        database.ClearQueuedSelectors();
-        foreach (QueuedSelector selector in selectors)
-        {
-            this.AddToQueue(selector.DeepCopy(), database);
-        }
+        // using Transaction transaction = database.Realm.BeginWrite();
+        List<QueuedSelector> selectors = database.GetAllQueuedSelectors().AsEnumerable().ToList();
+        // database.ClearQueuedSelectors();
         
         //Enqueue all URLs to crawl
         foreach (Uri uri in this._uris)
+        {
             this.AddToQueue(new QueuedSelector
             {
                 Uri = uri
-            }, databaseProvider.GetContext());
-        transaction.Commit();
+            }, database, false);
+        }
+        
+        // transaction.Commit();
     }
 
-    private void AddToQueue(QueuedSelector selector, VoyagerDatabaseContext database)
+    private void AddToQueue(QueuedSelector selector, VoyagerDatabaseContext database, bool fillDatabase)
     {
         if (this._blacklistedHosts.Contains(selector.Uri.Host))
         {
-            Console.WriteLine($"Refusing to add blacklisted host {selector.Uri.Host}");
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add blacklisted host {0}", selector.Uri.Host);
             return;
         }
         
         if(selector.Uri.Host.Contains("git", StringComparison.InvariantCultureIgnoreCase))
         {
-            Console.WriteLine($"Refusing to add git host");
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add git host");
             return;
         }
         
         if(selector.Uri.Host.Contains("scm", StringComparison.InvariantCultureIgnoreCase))
         {
-            Console.WriteLine($"Refusing to add scm host");
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add scm host");
+            return;
+        }
+        
+        if(selector.Uri.Host.Contains("ftp", StringComparison.InvariantCultureIgnoreCase))
+        {
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add ftp host");
             return;
         }
         
         if(selector.Uri.AbsolutePath.Contains("/git", StringComparison.InvariantCultureIgnoreCase))
         {
-            Console.WriteLine($"Refusing to add git selector");
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add git selector");
             return;
         }
         
         if(selector.Uri.AbsolutePath.Contains("/scm", StringComparison.InvariantCultureIgnoreCase))
         {
-            Console.WriteLine($"Refusing to add scm selector");
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add scm selector");
+            return;
+        }
+        
+        if(selector.Uri.AbsolutePath.Contains("/commit/", StringComparison.InvariantCultureIgnoreCase))
+        {
+            _logger.LogInfo(VoyagerCategory.Spider, "Refusing to add commit selector");
             return;
         }
         
@@ -83,15 +97,25 @@ public class Spider
             }
         }
 
-        if (!database.Crawled(selector.Uri) && queue.All(q => q._Uri != selector._Uri))
+        bool all = true;
+        foreach (QueuedSelector q in queue)
         {
-            Console.WriteLine($"Adding {selector.Uri} to queue");
+            if (q._Uri != selector._Uri) continue;
+            
+            all = false;
+            break;
+        }
+        
+        if (!database.Crawled(selector._Uri) && all)
+        {
+            _logger.LogInfo(VoyagerCategory.Spider, "Adding {0} to queue", selector._Uri);
             queue.Enqueue(selector);
-            database.AddQueuedSelector(selector);
+            if(fillDatabase)
+                database.AddQueuedSelector(selector);
         }
         else
         {
-            Console.WriteLine($"Selector {selector.Uri} has already been crawled, not adding!");
+            _logger.LogInfo(VoyagerCategory.Spider, "Selector {0} has already been crawled, not adding!", selector._Uri);
         }
     }
 
@@ -110,6 +134,24 @@ public class Spider
                 Id = i,
             };
             threads[i].Thread.Start(threads[i]);
+        }
+
+        VoyagerDatabaseContext database = this._databaseProvider.GetContext();
+        IQueryable<QueuedSelector> selectors = database.GetAllQueuedSelectors();
+        int queued = 0;
+        int count = selectors.Count();
+        foreach (QueuedSelector selector in selectors)
+        {
+            if (Console.KeyAvailable)
+            {
+                //If the enter key was hit
+                if (Console.ReadKey().Key == ConsoleKey.Enter)
+                    break;
+            }
+            
+            this.AddToQueue(selector.DeepCopy(), database, false);
+            this._logger.LogInfo(VoyagerCategory.Spider, "Filling queue from database... {0}/{1}", queued, count);
+            queued++;
         }
 
         while (true)
@@ -147,14 +189,16 @@ public class Spider
     {
         ThreadData data = (ThreadData)obj!;
 
-        int i = 0;
+        int j = 0;
         while (data.Run)
         {
             //Sleep for 10ms, lets not completely eat up the whole CPU!
             Thread.Sleep(10);
 
-            i++;
-            i = (i + data.Id) % this._queues.Count;
+            j++;
+            j %= this._queues.Count;
+            //Create an index that is offset by the thread id, this should stagger better
+            int i = (j + data.Id) % this._queues.Count;
 
             string host;
             //Get a random host
@@ -177,14 +221,14 @@ public class Spider
 
             Uri uri = selector.Uri;
             
-            if (database.Crawled(uri))
+            if (database.Crawled(uri.ToString()))
             {
-                Console.WriteLine($"Already crawled {uri}, skipping");
+                _logger.LogInfo(VoyagerCategory.Spider, "Already crawled {0}, skipping", uri);
                 data.Busy = false;
                 continue;
             }
 
-            Console.WriteLine($"Crawling URI {uri}");
+            _logger.LogInfo(VoyagerCategory.Spider, "Crawling URI {0}", uri);
 
             try
             {
@@ -208,7 +252,7 @@ public class Spider
                                     {
                                         Uri = uri1,
                                         DisplayName = submenuLine.DisplayString
-                                    }, database);
+                                    }, database, true);
                                 }
                                 catch
                                 {
@@ -229,17 +273,17 @@ public class Spider
             }
             catch(TimeoutException ex)
             {
-                Console.WriteLine($"Timeout! {ex}");
+                _logger.LogInfo(VoyagerCategory.Spider, "Timeout! {0}", ex);
                 database.Realm.Write(() => database.SetHostCrawlStatus(uri.Host, true));
             }
             catch(SocketException ex)
             {
-                Console.WriteLine($"Socket exception! {ex}");
+                _logger.LogInfo(VoyagerCategory.Spider, "Socket exception! {0}", ex);
                 database.Realm.Write(() => database.SetHostCrawlStatus(uri.Host, true));
             }
             catch(IOException ex)
             {
-                Console.WriteLine(ex);
+                _logger.LogInfo(VoyagerCategory.Spider, ex.ToString());
                 database.Realm.Write(() => database.SetHostCrawlStatus(uri.Host, true));
             }
 

@@ -25,10 +25,13 @@ public class VoyagerDatabaseContext : RealmDatabaseContext
         return index;
     }
 
-    public bool Crawled(Uri uri)
+    public bool Crawled(string uri)
     {
         return this._realm.Find<Index>(uri.ToString()) != null;
     }
+
+    public IQueryable<Index> GetAllIndexedPages() => this._realm.All<Index>();
+    public IQueryable<CrawledHost> GetAllCrawledHosts() => this._realm.All<CrawledHost>();
 
     public void AddQueuedSelector(QueuedSelector selector)
     {
@@ -41,10 +44,10 @@ public class VoyagerDatabaseContext : RealmDatabaseContext
 
     public void RemoveQueuedSelector(QueuedSelector selector)
     {
-        this._realm.RemoveRange(this.GetQueuedSelectors().Where(s => s._Uri == selector._Uri));
+        this._realm.RemoveRange(this.GetAllQueuedSelectors().Where(s => s._Uri == selector._Uri));
     }
 
-    public IQueryable<QueuedSelector> GetQueuedSelectors()
+    public IQueryable<QueuedSelector> GetAllQueuedSelectors()
     {
         return this._realm.All<QueuedSelector>();
     }
@@ -62,5 +65,12 @@ public class VoyagerDatabaseContext : RealmDatabaseContext
             LastCrawl = DateTimeOffset.UtcNow,
             Failed = failed
         }, true);
+    }
+    public IQueryable<Index> Search(string query)
+    {
+        return this._realm.All<Index>()
+            .Where(index 
+                => QueryMethods.FullTextSearch(index.DisplayName, query) 
+                || QueryMethods.Contains(index.Uri, query, StringComparison.OrdinalIgnoreCase));
     }
 }

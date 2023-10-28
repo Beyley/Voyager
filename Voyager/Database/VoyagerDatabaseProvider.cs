@@ -25,7 +25,10 @@ public class VoyagerDatabaseProvider : RealmDatabaseProvider<VoyagerDatabaseCont
         get => "voyager.realm";
     }
     public override void Warmup()
-    {}
+    {
+        VoyagerDatabaseContext database = this.GetContext();
+        _ = database.GetAllIndexedPages().Count();
+    }
     protected override void Migrate(Migration migration, ulong oldVersion)
     {}
 }
