@@ -1,0 +1,3 @@
+[submodule "ude"]
+	path = ude
+	url = https://github.com/Beyley/ude

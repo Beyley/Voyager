@@ -1,6 +1,6 @@
 using Realms;
 
-namespace Voyager.Spider;
+namespace Voyager.Gopher;
 
 public partial class GopherLine : IEmbeddedObject
 {

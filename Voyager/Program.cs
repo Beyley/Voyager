@@ -13,7 +13,7 @@ provider.Initialize();
 LoggerConfiguration logConfig = new()
 {
     Behaviour = new QueueLoggingBehaviour(),
-    MaxLevel = LogLevel.Trace,
+    MaxLevel = LogLevel.Trace
 };
 
 using Logger logger = new(logConfig);
@@ -24,7 +24,7 @@ BunkumGeminiServer geminiServer = new(null, logConfig);
 gopherServer.Initialize = s =>
 {
     VoyagerDatabaseProvider provider = new();
-    
+
     s.DiscoverEndpointsFromAssembly(Assembly.GetExecutingAssembly());
     s.AddSerializer<BunkumGophermapSerializer>();
     s.UseDatabaseProvider(provider);
@@ -33,7 +33,7 @@ gopherServer.Initialize = s =>
 geminiServer.Initialize = s =>
 {
     VoyagerDatabaseProvider provider = new();
-    
+
     s.DiscoverEndpointsFromAssembly(Assembly.GetExecutingAssembly());
     s.AddSerializer<BunkumGophermapGeminiSerializer>();
     s.UseDatabaseProvider(provider);

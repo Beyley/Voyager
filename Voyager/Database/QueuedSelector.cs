@@ -9,17 +9,16 @@ public partial class QueuedSelector : IRealmObject
     [Ignored]
     public Uri Uri
     {
-        get => new Uri(_Uri); 
-        set => _Uri = value.ToString();
+        get => new(this._Uri);
+        set => this._Uri = value.ToString();
     }
     public string? DisplayName { get; set; }
+    public bool Reindex { get; set; }
 
-    public QueuedSelector DeepCopy()
+    public QueuedSelector DeepCopy() => new()
     {
-        return new QueuedSelector
-        {
-            _Uri = this._Uri,
-            DisplayName = this.DisplayName
-        };
-    }
+        _Uri = this._Uri,
+        DisplayName = this.DisplayName,
+        Reindex = this.Reindex,
+    };
 }

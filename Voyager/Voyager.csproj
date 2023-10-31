@@ -17,4 +17,8 @@
         <PackageReference Include="Realm" Version="11.5.0"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\ude\Ude.csproj\Ude\Ude.csproj"/>
+    </ItemGroup>
+
 </Project>

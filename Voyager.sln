@@ -4,6 +4,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voyager", "Voyager\Voyager.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voyager.Spider", "Voyager.Spider\Voyager.Spider.csproj", "{CBD480C6-FF89-4ABC-8262-EFEBA5A7AF12}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{0F1F3C63-3B79-4868-AD82-1F16BDFBF82B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ude", "ude\Ude.csproj\Ude\Ude.csproj", "{245A2D1E-6F2A-442E-B9E0-6B8FFFAE1D6A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +22,12 @@ Global
 		{CBD480C6-FF89-4ABC-8262-EFEBA5A7AF12}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBD480C6-FF89-4ABC-8262-EFEBA5A7AF12}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CBD480C6-FF89-4ABC-8262-EFEBA5A7AF12}.Release|Any CPU.Build.0 = Release|Any CPU
+		{245A2D1E-6F2A-442E-B9E0-6B8FFFAE1D6A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{245A2D1E-6F2A-442E-B9E0-6B8FFFAE1D6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{245A2D1E-6F2A-442E-B9E0-6B8FFFAE1D6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{245A2D1E-6F2A-442E-B9E0-6B8FFFAE1D6A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{245A2D1E-6F2A-442E-B9E0-6B8FFFAE1D6A} = {0F1F3C63-3B79-4868-AD82-1F16BDFBF82B}
 	EndGlobalSection
 EndGlobal

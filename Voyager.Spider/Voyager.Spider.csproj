@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Voyager\Voyager.csproj" />
+        <ProjectReference Include="..\Voyager\Voyager.csproj"/>
     </ItemGroup>
 
 </Project>

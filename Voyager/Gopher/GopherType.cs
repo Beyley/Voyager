@@ -1,4 +1,4 @@
-namespace Voyager.Spider;
+namespace Voyager.Gopher;
 
 public enum GopherType : byte
 {
